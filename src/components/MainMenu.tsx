@@ -12,11 +12,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onNavigate }) => {
     return (
         <div className="app-container mobile-stack" style={{ flexDirection: 'row', padding: '1rem', gap: '1rem' }}>
 
-            {/* Sidebar: User Info & Actions */}
             <motion.div
                 initial={{ x: -100, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                className="glass-panel"
+                className="glass-panel mobile-sidebar"
                 style={{ width: '250px', display: 'flex', flexDirection: 'column', padding: '1.5rem', justifyContent: 'space-between' }}
             >
                 <div>
@@ -56,9 +55,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onNavigate }) => {
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', minWidth: 0 }}
             >
-                <div style={{ flex: 1, display: 'flex', gap: '1.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                <div className="mobile-card-wrapper" style={{ flex: 1, display: 'flex', gap: '1.5rem', justifyContent: 'center', alignItems: 'center' }}>
 
                     {/* Locked Modes */}
                     <ModeCard

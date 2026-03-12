@@ -123,8 +123,28 @@ body, html {
     padding: 15px !important;
   }
 
+  /* Sidebar handling for MainMenu */
+  .mobile-sidebar {
+    width: 170px !important;
+    padding: 1rem !important;
+  }
+  
+  .mobile-sidebar .btn-secondary {
+    font-size: 0.85rem !important;
+    padding: 8px 10px !important;
+  }
+  
+  /* Horizontal scroll for cards if they don't fit */
+  .mobile-card-wrapper {
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    padding-bottom: 15px !important;
+    gap: 1rem !important;
+  }
+
   /* Main Menu Cards - Scale down to fit 400px height screens */
   .mobile-card {
+    min-width: 180px !important;
     width: 180px !important;
     height: 250px !important;
     margin: 5px !important;
