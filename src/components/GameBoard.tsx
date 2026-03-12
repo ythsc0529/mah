@@ -580,6 +580,12 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
         left: { left: '150px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
         right: { right: '150px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
     };
+    const meldHandContainerStyles: Record<string, React.CSSProperties> = {
+        bottom: { flexDirection: 'column' },
+        top: { flexDirection: 'column-reverse' },
+        left: { flexDirection: 'row-reverse' },
+        right: { flexDirection: 'row' }
+    };
 
     return (
         <>
@@ -598,9 +604,9 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '10px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', ...(meldHandContainerStyles[position] || {}) }}>
                     {player.melds?.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '5px', paddingRight: isVertical ? '0' : '15px' }}>
+                        <div style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '5px' }}>
                             {player.melds.map((m: any, i: number) => (
                                 <div key={i} style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '1px' }}>
                                     {m.tiles.map((t: any) => (<TileRender key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical} isMeld={true} isHidden={m.type === 'concealed_kong' && !isLocal} />))}
