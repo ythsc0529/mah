@@ -32,6 +32,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     const [currentWind, setCurrentWind] = useState<string>('east');
     const [windRoundCount, setWindRoundCount] = useState<number>(0);
     const [isGameOver, setIsGameOver] = useState(false);
+    const [consecutiveDealerCount, setConsecutiveDealerCount] = useState<number>(0);
 
     useEffect(() => {
         engine.initializePlayers("Player One", ["Bot Dong", "Bot Nan", "Bot Xi"]);
@@ -86,8 +87,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             setMessage(`${p.name} 的回合 (NPC)`);
             updateState();
             delayObj.current = setTimeout(() => {
-                // Basic NPC AI: just discard the last tile
-                if (p.hand.length > 0) {
+                // Smarter NPC AI: use getBestDiscard to filter terminals and isolated winds
+                const bestDiscard = engine.getBestDiscard(pIdx);
+                if (bestDiscard) {
+                    handleDiscard(pIdx, bestDiscard.id);
+                } else if (p.hand.length > 0) {
+                     // Fallback
                     const discardTileId = p.hand[p.hand.length - 1].id;
                     handleDiscard(pIdx, discardTileId);
                 }
@@ -188,7 +193,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                 
                 delayObj.current = setTimeout(() => {
                      // Dealer stays on draw
-                     startNewHand(engine.dealerIndex);
+                     advanceRound(null); // passing null signifies a draw
                 }, 3000);
                 return;
             }
@@ -319,7 +324,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                      setMessage('流局 (Draw)!');
                      
                      delayObj.current = setTimeout(() => {
-                          startNewHand(engine.dealerIndex);
+                          advanceRound(null); // Draw
                      }, 3000);
                      return;
                  }
@@ -349,11 +354,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
         }
     };
 
-    const advanceRound = (winnerName: string) => {
-         const winnerIdx = players.findIndex(p => p.name === winnerName);
+    const advanceRound = (winnerName: string | null) => {
+         const isDraw = winnerName === null;
+         const winnerIdx = isDraw ? -1 : players.findIndex(p => p.name === winnerName);
          
-         if (winnerIdx !== engine.dealerIndex) {
+         if (isDraw || winnerIdx === engine.dealerIndex) {
+             // Dealer stays (連莊) or draw
+             setConsecutiveDealerCount(prev => prev + 1);
+             startNewHand(engine.dealerIndex);
+         } else {
              // Dealer rotates
+             setConsecutiveDealerCount(0);
              const newDealer = (engine.dealerIndex + 1) % 4;
              if (newDealer === 0) {
                  // Completed a wind round
@@ -377,9 +388,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                  }
              }
              startNewHand(newDealer);
-         } else {
-             // Dealer stays (連莊 - simple mode without extra Tai implemented yet)
-             startNewHand(engine.dealerIndex);
          }
     };
 
@@ -460,10 +468,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                 )}
             </AnimatePresence>
 
-            <PlayerArea player={players[2]} position="top" isDealer={engine.dealerIndex === 2 && !selectingDealer} isCurrentTurn={engine.currentTurn === 2 && isStarted} />
-            <PlayerArea player={players[1]} position="right" isDealer={engine.dealerIndex === 1 && !selectingDealer} isCurrentTurn={engine.currentTurn === 1 && isStarted} />
-            <PlayerArea player={players[3]} position="left" isDealer={engine.dealerIndex === 3 && !selectingDealer} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
-            <PlayerArea player={players[0]} position="bottom" isLocal={true} isDealer={engine.dealerIndex === 0 && !selectingDealer} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
+            <PlayerArea player={players[2]} position="top" isDealer={engine.dealerIndex === 2 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 2 && isStarted} />
+            <PlayerArea player={players[1]} position="right" isDealer={engine.dealerIndex === 1 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 1 && isStarted} />
+            <PlayerArea player={players[3]} position="left" isDealer={engine.dealerIndex === 3 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
+            <PlayerArea player={players[0]} position="bottom" isLocal={true} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
 
             <AnimatePresence>
                 {selectingDealer && (
@@ -558,7 +566,7 @@ const ActionButton = ({ label, color, onClick }: { label: string, color: string,
     </motion.button>
 );
 
-const PlayerArea = ({ player, position, isLocal = false, isDealer, isCurrentTurn, onDiscard }: any) => {
+const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak, isCurrentTurn, onDiscard }: any) => {
     const isVertical = position === 'left' || position === 'right';
     const posStyles: Record<string, React.CSSProperties> = {
         bottom: { bottom: '20px', left: '50%', transform: 'translateX(-50%)', flexDirection: 'column' },
@@ -583,7 +591,9 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, isCurrentTurn
                 }}>
                     <div style={{ width: '40px', height: '40px', background: isLocal ? 'var(--primary)' : '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{player.name[0]}</div>
                     <div style={{ textAlign: isVertical ? 'center' : 'left' }}>
-                        <div style={{ fontSize: '0.9rem', color: isDealer ? 'var(--primary)' : '#fff', fontWeight: 'bold' }}>{player.name} {isDealer && '(莊)'}</div>
+                        <div style={{ fontSize: '0.9rem', color: isDealer ? 'var(--primary)' : '#fff', fontWeight: 'bold' }}>
+                            {player.name} {isDealer && `(莊)${dealerStreak > 0 ? `[連${dealerStreak}]` : ''}`}
+                        </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{player.points} pts</div>
                     </div>
                 </div>

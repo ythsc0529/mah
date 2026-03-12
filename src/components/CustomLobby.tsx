@@ -44,7 +44,7 @@ export const CustomLobby: React.FC<CustomLobbyProps> = ({ onBack, onCreateRoom, 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="glass-panel"
+                className="glass-panel mobile-modal"
                 style={{ padding: '3rem', width: '500px', display: 'flex', flexDirection: 'column', gap: '2rem' }}
             >
                 <h1 style={{ color: 'var(--primary)', textAlign: 'center', fontSize: '2rem' }}>
@@ -94,7 +94,7 @@ export const CustomLobby: React.FC<CustomLobbyProps> = ({ onBack, onCreateRoom, 
                         </div>
 
                         {/* Keypad */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', width: '250px' }}>
+                        <div className="keypad-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', width: '250px' }}>
                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
                                 <button key={num} className="btn-secondary" style={{ padding: '15px' }} onClick={() => handleKeypad(num)}>
                                     {num}

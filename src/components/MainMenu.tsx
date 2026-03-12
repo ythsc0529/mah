@@ -10,7 +10,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onNavigate }) => {
     const [showFriends, setShowFriends] = useState(false);
 
     return (
-        <div className="app-container" style={{ flexDirection: 'row', padding: '1rem', gap: '1rem' }}>
+        <div className="app-container mobile-stack" style={{ flexDirection: 'row', padding: '1rem', gap: '1rem' }}>
 
             {/* Sidebar: User Info & Actions */}
             <motion.div
@@ -133,7 +133,7 @@ const ModeCard: React.FC<ModeCardProps> = ({ title, subtitle, icon, locked, colo
             whileHover={locked ? {} : { y: -10, scale: 1.02 }}
             whileTap={locked ? {} : { scale: 0.98 }}
             onClick={!locked ? onClick : undefined}
-            className="glass-panel"
+            className="glass-panel mobile-card"
             style={{
                 width: '280px',
                 height: '400px',

@@ -49,7 +49,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({ roomId, isHost, onBack, on
                 離開房間
             </button>
 
-            <div style={{ display: 'flex', gap: '2rem', height: '100%', marginTop: '4rem' }}>
+            <div className="mobile-room-layout" style={{ display: 'flex', gap: '2rem', height: '100%', marginTop: '4rem' }}>
 
                 {/* Players Area */}
                 <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -57,7 +57,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({ roomId, isHost, onBack, on
                         <Users /> 房間號碼: <span style={{ color: 'var(--primary)', letterSpacing: '4px' }}>{roomId}</span>
                     </h2>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1 }}>
+                    <div className="mobile-card-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', flex: 1 }}>
                         {players.map((p, idx) => (
                             <motion.div
                                 key={idx}

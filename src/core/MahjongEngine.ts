@@ -155,7 +155,7 @@ export class MahjongEngine {
     }
 
     drawTile(playerIndex: number): Tile | null {
-        if (this.deck.length === 0) return null; // Game draw / 流局
+        if (this.deck.length <= 14) return null; // Game draw / 流局 (鐵八墩: 14 tiles typically left in TW Mahjong)
         const tile = this.deck.pop();
         if (tile) {
             this.players[playerIndex].hand.push(tile);
@@ -237,6 +237,56 @@ export class MahjongEngine {
         }
 
         return available;
+    }
+
+    getBestDiscard(playerIndex: number): Tile | null {
+        const p = this.players[playerIndex];
+        if (p.hand.length === 0) return null;
+        
+        // Count occurrences of each face (ignoring ID to find duplicates/pairs/triplets)
+        const counts = new Map<string, Tile[]>();
+        for (const t of p.hand) {
+             const key = `${t.type}-${t.value}`;
+             if (!counts.has(key)) counts.set(key, []);
+             counts.get(key)!.push(t);
+        }
+
+        const isolatedWinds: Tile[] = [];
+        const isolatedDragons: Tile[] = [];
+        const isolatedTerminals: Tile[] = [];
+        const isolatedMiddles: Tile[] = [];
+        
+        for (const [, group] of counts.entries()) {
+             if (group.length > 1) continue; // It's at least a pair
+             
+             const t = group[0];
+             if (t.type === 'wind') {
+                 isolatedWinds.push(t);
+             } else if (t.type === 'dragon') {
+                 isolatedDragons.push(t);
+             } else {
+                 // It's a suit tile. Check if it's completely isolated (no neighbors)
+                 const val = t.value as number;
+                 const type = t.type;
+                 
+                 const hasAdj = (v: number) => p.hand.some(ht => ht.type === type && ht.value === v);
+                 if (!hasAdj(val - 1) && !hasAdj(val - 2) && !hasAdj(val + 1) && !hasAdj(val + 2)) {
+                      if (val === 1 || val === 9) isolatedTerminals.push(t);
+                      else isolatedMiddles.push(t);
+                 }
+             }
+        }
+        
+        // Priority to discard: Isolated Wind -> Isolated Dragon -> Isolated 1 or 9 -> Isolated Middle -> fallback (last drawn)
+        if (isolatedWinds.length > 0) return isolatedWinds[0];
+        if (isolatedDragons.length > 0) return isolatedDragons[0];
+        if (isolatedTerminals.length > 0) return isolatedTerminals[0];
+        if (isolatedMiddles.length > 0) return isolatedMiddles[0];
+        
+        // If it reaches here, the NPC might have pairs, triplets, or sequences taking up the entire hand.
+        // It should break a terminal sequence or terminal pair last, so we just pop the last tile arbitrarily 
+        // as a fallback (since we don't have deep Lookahead AI here yet).
+        return p.hand[p.hand.length - 1];
     }
 
     executeAction(playerIndex: number, action: string, targetTile: Tile | null, discardingPlayerIndex: number) {

@@ -99,3 +99,51 @@ body, html {
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* Base Responsive Classes for Lobbies */
+.mobile-stack {
+  display: flex;
+}
+
+.mobile-card {
+  width: 280px;
+}
+
+.mobile-modal {
+  width: 500px;
+}
+
+@media (max-width: 850px) {
+  .app-container.mobile-stack {
+    flex-direction: column !important;
+    overflow-y: auto !important; /* Allow scrolling on menus if needed */
+    padding: 10px !important;
+  }
+  .app-container.mobile-stack > div {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .mobile-card {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 150px;
+    padding: 20px;
+  }
+  .mobile-card-grid {
+    flex-direction: column !important;
+  }
+  .mobile-modal {
+    width: 90% !important;
+    padding: 20px !important;
+  }
+  .mobile-room-layout {
+    flex-direction: column !important;
+    margin-top: 60px !important;
+  }
+  
+  /* Ensure keypad grid scales */
+  .keypad-grid {
+    width: 100% !important;
+    max-width: 300px;
+  }
+}
