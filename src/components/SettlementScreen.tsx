@@ -41,7 +41,7 @@ export const SettlementScreen: React.FC<SettlementScreenProps> = ({
                 initial={{ scale: 0.8, y: 50 }}
                 animate={{ scale: 1, y: 0 }}
                 transition={{ type: 'spring', bounce: 0.4 }}
-                className="glass-panel"
+                className="glass-panel settlement-panel"
                 style={{
                     width: '600px', padding: '3rem', border: '2px solid var(--primary)',
                     boxShadow: '0 0 50px rgba(201, 147, 59, 0.4)', textAlign: 'center'
@@ -64,7 +64,7 @@ export const SettlementScreen: React.FC<SettlementScreenProps> = ({
                     <h3 style={{ color: 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
                         台數結算 (Tai Breakdown)
                     </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+                    <div className="tai-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
                         {taiReasons.map((r, i) => (
                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', color: '#e5e7eb' }}>
                                 <span>{r.name}</span>
@@ -78,7 +78,7 @@ export const SettlementScreen: React.FC<SettlementScreenProps> = ({
                     </div>
                 </div>
 
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', textShadow: '0 2px 10px rgba(239, 68, 68, 0.5)' }}>
+                <div className="total-points" style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', textShadow: '0 2px 10px rgba(239, 68, 68, 0.5)' }}>
                     總計贏得: {totalPoints} 點
                 </div>
 

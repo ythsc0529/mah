@@ -113,37 +113,90 @@ body, html {
   width: 500px;
 }
 
-@media (max-width: 850px) {
-  .app-container.mobile-stack {
-    flex-direction: column !important;
-    overflow-y: auto !important; /* Allow scrolling on menus if needed */
+/* Landscape Mode (Mobile devices in horizontal orientation / short screens) */
+@media (max-height: 600px) {
+  .app-container {
     padding: 10px !important;
   }
-  .app-container.mobile-stack > div {
-    width: 100% !important;
-    max-width: none !important;
+  
+  .glass-panel {
+    padding: 15px !important;
   }
+
+  /* Main Menu Cards - Scale down to fit 400px height screens */
   .mobile-card {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 150px;
-    padding: 20px;
-  }
-  .mobile-card-grid {
-    flex-direction: column !important;
-  }
-  .mobile-modal {
-    width: 90% !important;
-    padding: 20px !important;
-  }
-  .mobile-room-layout {
-    flex-direction: column !important;
-    margin-top: 60px !important;
+    width: 180px !important;
+    height: 250px !important;
+    margin: 5px !important;
   }
   
-  /* Ensure keypad grid scales */
+  .mobile-card h2 {
+    font-size: 1.3rem !important;
+    margin-bottom: 5px !important;
+  }
+
+  .mobile-card svg {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 10px;
+  }
+
+  /* Modals and panels */
+  .mobile-modal {
+    width: 85vw !important;
+    padding: 1.5rem !important;
+  }
+  
+  /* Modal Title */
+  .mobile-modal h1 {
+    font-size: 1.5rem !important;
+  }
+
+  /* Room Lobby Grid Expansion */
+  .mobile-room-layout {
+    margin-top: 10px !important;
+    gap: 15px !important;
+  }
+  
+  .mobile-room-layout h2 {
+    font-size: 1.2rem !important;
+  }
+
+  /* We force side-by-side in landscape instead of 2x2 wrapping */
+  .mobile-card-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 10px !important;
+  }
+  
+  .mobile-card-grid .glass-panel {
+    padding: 10px !important;
+  }
+
+  .mobile-card-grid .glass-panel h3 {
+    font-size: 0.9rem !important;
+  }
+
+  /* Custom Lobby Keypad */
   .keypad-grid {
-    width: 100% !important;
-    max-width: 300px;
+    width: 200px !important;
+    gap: 5px !important;
+  }
+  .keypad-grid button {
+    padding: 8px !important;
+  }
+  
+  /* Settlement Screen */
+  .settlement-panel {
+    width: 80vw !important;
+    padding: 1.5rem !important;
+  }
+  .settlement-panel h1 {
+    font-size: 1.8rem !important;
+  }
+  .settlement-panel .total-points {
+    font-size: 1.4rem !important;
+  }
+  .settlement-panel .tai-list {
+    max-height: 80px !important;
   }
 }
