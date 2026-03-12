@@ -211,6 +211,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
              };
              const taiResult = TaiCalculator.calculate(winResult, players[winnerIdx], context);
 
+             // Calculate actual points
+             const baseP = parseInt(config?.points.split('/')[0] || '50');
+             const taiP = parseInt(config?.points.split('/')[1] || '20');
+             const totalWinPoints = baseP + (taiResult.totalTai * taiP);
+
+             if (isSelfDraw) {
+                 players.forEach((p, i) => {
+                     if (i === winnerIdx) p.points += totalWinPoints * 3;
+                     else p.points -= totalWinPoints;
+                 });
+             } else {
+                 players[winnerIdx].points += totalWinPoints;
+                 players[fromPlayerIdx].points -= totalWinPoints;
+             }
+             setPlayers([...players]);
+
              setSettlementData({
                   winnerName: players[winnerIdx].name,
                   loserName: isSelfDraw ? '所有人' : players[fromPlayerIdx].name,
@@ -608,12 +624,14 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, isCurrentTurn
 }
 
 const TileRender = ({ tile, isLocal, isVertical, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false }: any) => {
-    let width = isVertical ? '30px' : (isLocal || isMeld ? '48px' : '30px');
-    let height = isVertical ? '40px' : (isLocal || isMeld ? '64px' : '40px');
-    let fontSize = '1.2rem';
+    let width = isVertical ? 'clamp(20px, 3vh, 30px)' : (isLocal || isMeld ? 'clamp(32px, 4.5vw, 48px)' : 'clamp(20px, 3vw, 30px)');
+    let height = isVertical ? 'clamp(28px, 4vh, 40px)' : (isLocal || isMeld ? 'clamp(44px, 6vw, 64px)' : 'clamp(28px, 4vw, 40px)');
+    let fontSize = isLocal || isMeld ? 'clamp(0.9rem, 1.5vw, 1.2rem)' : 'clamp(0.7rem, 1vw, 1rem)';
 
     if (isDiscard) {
-        width = '30px'; height = '45px'; fontSize = '1rem';
+        width = 'clamp(22px, 2.5vw, 30px)'; 
+        height = 'clamp(33px, 3.5vw, 45px)'; 
+        fontSize = 'clamp(0.7rem, 1vw, 1rem)';
     }
 
     const face = getTileFace(tile);
