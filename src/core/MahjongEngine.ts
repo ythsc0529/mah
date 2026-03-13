@@ -175,38 +175,49 @@ export class MahjongEngine {
         return discarded;
     }
 
-    getAvailableActions(discardingPlayerIndex: number, discardedTile: Tile | null): { playerIndex: number; actions: string[] }[] {
-        const available: { playerIndex: number; actions: string[] }[] = [];
+    getAvailableActions(discardingPlayerIndex: number, discardedTile: Tile | null): { playerIndex: number; actions: { type: string; tiles?: Tile[][] }[] }[] {
+        const available: { playerIndex: number; actions: { type: string; tiles?: Tile[][] }[] }[] = [];
 
         for (let i = 0; i < 4; i++) {
             const p = this.players[i];
-            const actions: string[] = [];
+            const actions: { type: string; tiles?: Tile[][] }[] = [];
 
             if (discardedTile !== null && i !== discardingPlayerIndex) {
                 // Check Pong / Kong (Exposed)
                 const isNextPlayer = (discardingPlayerIndex + 1) % 4 === i; // 上家
                 const matchingTiles = p.hand.filter(t => t.type === discardedTile.type && t.value === discardedTile.value);
                 
-                if (matchingTiles.length >= 2) actions.push('pong');
+                if (matchingTiles.length >= 2) actions.push({ type: 'pong' });
                 // Exposed Kong: Cannot Kong from the player to the left (上家)
-                if (matchingTiles.length === 3 && !isNextPlayer) actions.push('kong'); 
+                if (matchingTiles.length === 3 && !isNextPlayer) actions.push({ type: 'kong' }); 
 
                 // Check Chow: Can only eat from the player to the left (上家)
                 if (isNextPlayer && (discardedTile.type === 'character' || discardedTile.type === 'bamboo' || discardedTile.type === 'dot')) {
                     const type = discardedTile.type;
                     const val = discardedTile.value as number;
                     
-                    const hasTile = (v: number) => p.hand.some(t => t.type === type && t.value === v);
+                    const hasTile = (v: number) => p.hand.filter(t => t.type === type && t.value === v);
                     
-                    if ((hasTile(val - 2) && hasTile(val - 1)) ||
-                        (hasTile(val - 1) && hasTile(val + 1)) ||
-                        (hasTile(val + 1) && hasTile(val + 2))) {
-                        actions.push('chow');
+                    const combinations: Tile[][] = [];
+                    // Case 1: [val-2, val-1, val]
+                    if (hasTile(val - 2).length > 0 && hasTile(val - 1).length > 0) {
+                        combinations.push([hasTile(val - 2)[0], hasTile(val - 1)[0]]);
+                    }
+                    // Case 2: [val-1, val, val+1]
+                    if (hasTile(val - 1).length > 0 && hasTile(val + 1).length > 0) {
+                        combinations.push([hasTile(val - 1)[0], hasTile(val + 1)[0]]);
+                    }
+                    // Case 3: [val, val+1, val+2]
+                    if (hasTile(val + 1).length > 0 && hasTile(val + 2).length > 0) {
+                        combinations.push([hasTile(val + 1)[0], hasTile(val + 2)[0]]);
+                    }
+
+                    if (combinations.length > 0) {
+                        actions.push({ type: 'chow', tiles: combinations });
                     }
                 }
             } else if (discardedTile === null && i === this.currentTurn) {
-                // Check Concealed Kong (暗槓) - Only when it's the player's turn and they haven't discarded yet.
-                // Group hand by type and value
+                // Check Concealed Kong (暗槓) and Add Kong (加槓)
                 const counts = new Map<string, Tile[]>();
                 for (const t of p.hand) {
                      const key = `${t.type}-${t.value}`;
@@ -214,23 +225,39 @@ export class MahjongEngine {
                      counts.get(key)!.push(t);
                 }
                 
+                const concealedKongs: Tile[][] = [];
                 for (const group of counts.values()) {
                      if (group.length === 4) {
-                         // We just signal concealed kong is possible. 
-                         // To be precise, we need to know WHICH tile, but we'll adapt the UI for it later.
-                         actions.push('concealed_kong');
-                         break; 
+                         concealedKongs.push(group);
                      }
+                }
+                if (concealedKongs.length > 0) {
+                    actions.push({ type: 'concealed_kong', tiles: concealedKongs });
+                }
+
+                // Check Add Kong (加槓/小明槓)
+                // If draw a tile that matches a Pong in melds
+                const addKongs: Tile[][] = [];
+                for (const meld of p.melds) {
+                    if (meld.type === 'pong') {
+                        const pongTile = meld.tiles[0];
+                        const matchingInHand = p.hand.filter(t => t.type === pongTile.type && t.value === pongTile.value);
+                        if (matchingInHand.length > 0) {
+                            addKongs.push([matchingInHand[0]]);
+                        }
+                    }
+                }
+                if (addKongs.length > 0) {
+                    actions.push({ type: 'add_kong', tiles: addKongs });
                 }
             }
 
             // Check Hu (Win)
             const winCheck = WinValidator.checkHu(p.hand, p.melds, discardedTile !== null ? discardedTile : undefined);
             if (winCheck.isWin) {
-                actions.push('hu');
+                actions.push({ type: 'hu' });
             }
 
-            // Note: Hu is usually checked via WinValidator, we can append 'hu' to the actions list later in GameBoard.
             if (actions.length > 0) {
                 available.push({ playerIndex: i, actions });
             }
@@ -289,10 +316,21 @@ export class MahjongEngine {
         return p.hand[p.hand.length - 1];
     }
 
-    executeAction(playerIndex: number, action: string, targetTile: Tile | null, discardingPlayerIndex: number) {
+    executeAction(playerIndex: number, action: string, targetTile: Tile | null, discardingPlayerIndex: number, combinationTiles?: Tile[]) {
         const p = this.players[playerIndex];
         
-        const removeTiles = (count: number, condition: (t: Tile) => boolean) => {
+        const removeTilesByIds = (ids: string[]) => {
+            const removed: Tile[] = [];
+            for (const id of ids) {
+                const idx = p.hand.findIndex(t => t.id === id);
+                if (idx !== -1) {
+                    removed.push(p.hand.splice(idx, 1)[0]);
+                }
+            }
+            return removed;
+        };
+
+        const removeTilesByCount = (count: number, condition: (t: Tile) => boolean) => {
             const removed: Tile[] = [];
             for (let i = p.hand.length - 1; i >= 0 && removed.length < count; i--) {
                 if (condition(p.hand[i])) {
@@ -305,45 +343,72 @@ export class MahjongEngine {
         let didKong = false;
 
         if (action === 'pong' && targetTile) {
-            const removed = removeTiles(2, t => t.type === targetTile.type && t.value === targetTile.value);
+            const removed = removeTilesByCount(2, t => t.type === targetTile.type && t.value === targetTile.value);
             p.melds.push({ type: 'pong', tiles: [...removed, targetTile], fromPlayer: discardingPlayerIndex });
         } else if (action === 'kong' && targetTile) {
-            const removed = removeTiles(3, t => t.type === targetTile.type && t.value === targetTile.value);
+            const removed = removeTilesByCount(3, t => t.type === targetTile.type && t.value === targetTile.value);
             p.melds.push({ type: 'kong', tiles: [...removed, targetTile], fromPlayer: discardingPlayerIndex });
             didKong = true;
         } else if (action === 'concealed_kong') {
-            // Find a group of 4
-            const counts = new Map<string, Tile[]>();
-            for (const t of p.hand) {
-                 const key = `${t.type}-${t.value}`;
-                 if (!counts.has(key)) counts.set(key, []);
-                 counts.get(key)!.push(t);
+            const tilesToUse = combinationTiles || [];
+            if (tilesToUse.length === 4) {
+                const removed = removeTilesByIds(tilesToUse.map(t => t.id));
+                p.melds.push({ type: 'concealed_kong', tiles: removed });
+                didKong = true;
+            } else {
+                // Fallback: find any group of 4
+                const counts = new Map<string, Tile[]>();
+                for (const t of p.hand) {
+                     const key = `${t.type}-${t.value}`;
+                     if (!counts.has(key)) counts.set(key, []);
+                     counts.get(key)!.push(t);
+                }
+                for (const [key, group] of counts.entries()) {
+                     if (group.length === 4) {
+                         const [type, val] = key.split('-');
+                         const removed = removeTilesByCount(4, t => t.type === type && String(t.value) === val);
+                         p.melds.push({ type: 'concealed_kong', tiles: removed });
+                         didKong = true;
+                         break;
+                     }
+                }
             }
-            for (const [key, group] of counts.entries()) {
-                 if (group.length === 4) {
-                     const [type, val] = key.split('-');
-                     const removed = removeTiles(4, t => t.type === type && String(t.value) === val);
-                     p.melds.push({ type: 'concealed_kong', tiles: removed });
-                     didKong = true;
-                     break;
-                 }
+        } else if (action === 'add_kong' && combinationTiles && combinationTiles.length === 1) {
+            const tileToAdd = combinationTiles[0];
+            const idxInHand = p.hand.findIndex(t => t.id === tileToAdd.id);
+            if (idxInHand !== -1) {
+                p.hand.splice(idxInHand, 1);
+                // Find corresponding Pong in melds
+                const meldIdx = p.melds.findIndex(m => m.type === 'pong' && m.tiles[0].type === tileToAdd.type && m.tiles[0].value === tileToAdd.value);
+                if (meldIdx !== -1) {
+                    p.melds[meldIdx].type = 'kong';
+                    p.melds[meldIdx].tiles.push(tileToAdd);
+                    didKong = true;
+                }
             }
         } else if (action === 'chow' && targetTile) {
-            // Simplified: grab the first sequence. Real game needs user selection if multiple sequences available.
-            const val = targetTile.value as number;
-            const hasTile = (v: number) => p.hand.some(t => t.type === targetTile.type && t.value === v);
-            
-            let combo: number[] = [];
-            if (hasTile(val - 2) && hasTile(val - 1)) combo = [val - 2, val - 1];
-            else if (hasTile(val - 1) && hasTile(val + 1)) combo = [val - 1, val + 1];
-            else if (hasTile(val + 1) && hasTile(val + 2)) combo = [val + 1, val + 2];
+             const tilesToUse = combinationTiles || [];
+             if (tilesToUse.length === 2) {
+                 const removed = removeTilesByIds(tilesToUse.map(t => t.id));
+                 const sortedTotal = [...removed, targetTile].sort((a,b) => (a.value as number) - (b.value as number));
+                 p.melds.push({ type: 'chow', tiles: sortedTotal, fromPlayer: discardingPlayerIndex });
+             } else {
+                // Simplified fallback
+                const val = targetTile.value as number;
+                const hasTile = (v: number) => p.hand.some(t => t.type === targetTile.type && t.value === v);
+                
+                let combo: number[] = [];
+                if (hasTile(val - 2) && hasTile(val - 1)) combo = [val - 2, val - 1];
+                else if (hasTile(val - 1) && hasTile(val + 1)) combo = [val - 1, val + 1];
+                else if (hasTile(val + 1) && hasTile(val + 2)) combo = [val + 1, val + 2];
 
-            if (combo.length === 2) {
-                const r1 = removeTiles(1, t => t.type === targetTile.type && t.value === combo[0])[0];
-                const r2 = removeTiles(1, t => t.type === targetTile.type && t.value === combo[1])[0];
-                const sortedRest = [r1, r2].sort((a,b) => (a.value as number) - (b.value as number));
-                p.melds.push({ type: 'chow', tiles: [sortedRest[0], targetTile, sortedRest[1]], fromPlayer: discardingPlayerIndex });
-            }
+                if (combo.length === 2) {
+                    const r1 = removeTilesByCount(1, t => t.type === targetTile.type && t.value === combo[0])[0];
+                    const r2 = removeTilesByCount(1, t => t.type === targetTile.type && t.value === combo[1])[0];
+                    const sortedRest = [r1, r2, targetTile].sort((a,b) => (a.value as number) - (b.value as number));
+                    p.melds.push({ type: 'chow', tiles: sortedRest, fromPlayer: discardingPlayerIndex });
+                }
+             }
         }
 
         // Remove the tile from the discarding player's discards pool if it was a stolen tile

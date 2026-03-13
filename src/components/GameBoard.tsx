@@ -16,8 +16,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     const [engine] = useState(() => new MahjongEngine());
     const [players, setPlayers] = useState<Player[]>([]);
     const [isStarted, setIsStarted] = useState(false);
-    const [availableActions, setAvailableActions] = useState<string[]>([]);
+    const [availableActions, setAvailableActions] = useState<{ type: string; tiles?: Tile[][] }[]>([]);
     const [pendingActionTile, setPendingActionTile] = useState<{ tile: Tile, fromPlayerIndex: number } | null>(null);
+    const [chowChoices, setChowChoices] = useState<Tile[][] | null>(null);
 
     // Dealer Selection State
     const [selectingDealer, setSelectingDealer] = useState<boolean>(true);
@@ -121,8 +122,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             
             if (localSelfActions && localSelfActions.actions.length > 0) {
                  setAvailableActions(localSelfActions.actions);
-                 // We don't have a specific `targetTile` for concealed kong yet in UI, 
-                 // we will map it null for the pending state so it uses the executeAction fallback.
                  setPendingActionTile({ tile: null as any, fromPlayerIndex: pIdx });
             } else {
                  setAvailableActions([]);
@@ -161,7 +160,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             
             const checkAndSetPriority = (actionType: string) => {
                  if (highestPriorityAction) return;
-                 const doer = npcActions.find(a => a.actions.includes(actionType));
+                 const doer = npcActions.find(a => a.actions.some(ac => ac.type === actionType));
                  if (doer) highestPriorityAction = { npcIdx: doer.playerIndex, actionName: actionType };
             };
             
@@ -169,6 +168,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             checkAndSetPriority('kong');
             checkAndSetPriority('pong');
             checkAndSetPriority('chow');
+            checkAndSetPriority('add_kong');
+            checkAndSetPriority('concealed_kong');
 
             if (highestPriorityAction) {
                 delayObj.current = setTimeout(() => {
@@ -179,9 +180,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                          return;
                     }
                     
-                    engine.executeAction(npcIdx, actionName, tile, pIdx);
+                    // NPCs just take the first combination if any
+                    const actionData = npcActions.find(a => a.playerIndex === npcIdx)?.actions.find(ac => ac.type === actionName);
+                    const combination = actionData?.tiles ? actionData.tiles[0] : undefined;
+
+                    engine.executeAction(npcIdx, actionName, tile, pIdx, combination);
                     updateState();
-                    setMessage(`${engine.players[npcIdx].name} ${actionName === 'pong' ? '碰' : actionName === 'kong' ? '槓' : '吃'}！`);
+                    setMessage(`${engine.players[npcIdx].name} ${actionName === 'pong' ? '碰' : actionName.includes('kong') ? '槓' : '吃'}！`);
                     
                     // After NPC acts, it's their turn. They must discard after a delay.
                     delayObj.current = setTimeout(() => {
@@ -311,22 +316,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
         reasons: { name: string; tai: number }[];
     } | null>(null);
 
-    const handleAction = (action: string) => {
+    const handleAction = (actionType: string, selectedTiles?: Tile[]) => {
+        if (actionType === 'chow' && !selectedTiles) {
+            const actionData = availableActions.find(a => a.type === 'chow');
+            if (actionData?.tiles && actionData.tiles.length > 1) {
+                setChowChoices(actionData.tiles);
+                return;
+            } else if (actionData?.tiles && actionData.tiles.length === 1) {
+                selectedTiles = actionData.tiles[0];
+            }
+        }
+
         setAvailableActions([]);
-        if (action === 'hu') {
-            const isSelfDraw = !pendingActionTile;
-            const targetTile = pendingActionTile ? pendingActionTile.tile : players[0].hand[players[0].hand.length - 1]; 
+        setChowChoices(null);
+
+        if (actionType === 'hu') {
+            const isSelfDraw = !pendingActionTile || pendingActionTile.tile === null;
+            const targetTile = pendingActionTile && pendingActionTile.tile ? pendingActionTile.tile : players[0].hand[players[0].hand.length - 1]; 
             triggerHu(0, isSelfDraw, pendingActionTile ? pendingActionTile.fromPlayerIndex : 0, targetTile);
             return;
         }
 
-        if (action === 'skip') {
+        if (actionType === 'skip') {
              // Resume normal flow if skipping
              const actTile = pendingActionTile;
              setAvailableActions([]);
              setPendingActionTile(null);
              
-             if (actTile && actTile.tile === null) {
+             if (actTile && (actTile.tile === null || actTile.fromPlayerIndex === 0)) {
                  // Skip an own-turn action (e.g., concealed kong). Flow just continues as normal.
                  return;
              }
@@ -349,8 +366,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
         }
 
         // Execute Chow/Pong/Kong
-        if (pendingActionTile) {
-            engine.executeAction(0, action, pendingActionTile.tile, pendingActionTile.fromPlayerIndex);
+        if (pendingActionTile || actionType === 'concealed_kong' || actionType === 'add_kong') {
+            const fromPlayerIdx = pendingActionTile ? pendingActionTile.fromPlayerIndex : 0;
+            const targetTile = pendingActionTile ? pendingActionTile.tile : null;
+            
+            engine.executeAction(0, actionType, targetTile, fromPlayerIdx, selectedTiles);
             updateState();
             setPendingActionTile(null);
             
@@ -358,7 +378,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             setMessage('你的回合 (請打出一張牌)');
             
             // After a kong, check if another concealed kong is instantly available from the drawn replacement
-            if (action === 'kong' || action === 'concealed_kong') {
+            if (actionType.includes('kong')) {
                  const selfActions = engine.getAvailableActions(0, null);
                  const localSelfActions = selfActions.find(a => a.playerIndex === 0);
                  if (localSelfActions && localSelfActions.actions.length > 0) {
@@ -488,6 +508,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             <PlayerArea player={players[3]} position="left" isDealer={engine.dealerIndex === 3 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
             <PlayerArea player={players[0]} position="bottom" isLocal={true} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
 
+            {/* Local Dealer Indicator */}
+            {!selectingDealer && engine.dealerIndex === 0 && (
+                <div style={{ position: 'absolute', bottom: '100px', right: '20px', zIndex: 15 }}>
+                    <div className="glass-panel" style={{ padding: '8px 16px', color: 'gold', fontWeight: 'bold', border: '1px solid gold', background: 'rgba(0,0,0,0.6)' }}>
+                        你是莊家 {consecutiveDealerCount > 0 ? `連 ${consecutiveDealerCount}` : ''}
+                    </div>
+                </div>
+            )}
+
             <AnimatePresence>
                 {selectingDealer && (
                     <motion.div
@@ -534,13 +563,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                         initial={{ y: 100, opacity: 0, scale: 0.8 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
                         exit={{ y: 50, opacity: 0, scale: 0.9 }}
-                        style={{ position: 'absolute', bottom: '120px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '15px', zIndex: 50 }}
+                        style={{ position: 'absolute', bottom: chowChoices ? '200px' : '120px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '15px', zIndex: 50 }}
                     >
-                        {availableActions.includes('chow') && <ActionButton label="吃" color="#3b82f6" onClick={() => handleAction('chow')} />}
-                        {availableActions.includes('pong') && <ActionButton label="碰" color="#10b981" onClick={() => handleAction('pong')} />}
-                        {availableActions.includes('kong') && <ActionButton label="明槓" color="#eab308" onClick={() => handleAction('kong')} />}
-                        {availableActions.includes('concealed_kong') && <ActionButton label="暗槓" color="#ca8a04" onClick={() => handleAction('concealed_kong')} />}
-                        {availableActions.includes('hu') && (
+                        {availableActions.some(a => a.type === 'chow') && <ActionButton label="吃" color="#3b82f6" onClick={() => handleAction('chow')} />}
+                        {availableActions.some(a => a.type === 'pong') && <ActionButton label="碰" color="#10b981" onClick={() => handleAction('pong')} />}
+                        {availableActions.some(a => a.type === 'kong') && <ActionButton label="明槓" color="#eab308" onClick={() => handleAction('kong')} />}
+                        {availableActions.some(a => a.type === 'concealed_kong') && <ActionButton label="暗槓" color="#ca8a04" onClick={() => handleAction('concealed_kong')} />}
+                        {availableActions.some(a => a.type === 'add_kong') && <ActionButton label="加槓" color="#eab308" onClick={() => handleAction('add_kong')} />}
+                        {availableActions.some(a => a.type === 'hu') && (
                             // pendingActionTile being null means this is a self-draw (自摸)
                             <ActionButton
                                 label={!pendingActionTile || pendingActionTile.tile === null ? '自摸' : '胡'}
@@ -549,6 +579,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                             />
                         )}
                         <ActionButton label="過" color="#6b7280" onClick={() => handleAction('skip')} />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {chowChoices && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        style={{
+                            position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.85)', padding: '20px', borderRadius: '15px',
+                            display: 'flex', gap: '20px', zIndex: 51, border: '1px solid var(--primary)'
+                        }}
+                    >
+                        {chowChoices.map((choice, i) => (
+                            <div key={i} onClick={() => handleAction('chow', choice)} style={{ cursor: 'pointer', display: 'flex', gap: '5px' }}>
+                                 {choice.map(t => <TileRender key={t.id} tile={t} isLocal={true} />)}
+                            </div>
+                        ))}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -650,7 +701,7 @@ const ActionButton = ({ label, color, onClick }: { label: string, color: string,
     </motion.button>
 );
 
-const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, onDiscard }: any) => {
+const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer, dealerStreak, onDiscard }: any) => {
     const isVertical = position === 'left' || position === 'right';
     const posStyles: Record<string, React.CSSProperties> = {
         bottom: { bottom: '20px', left: '50%', transform: 'translateX(-50%)', flexDirection: 'column' },
@@ -680,6 +731,16 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, onDiscar
                     transition: 'box-shadow 0.3s ease'
                 }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', ...(meldHandContainerStyles[position] || {}) }}>
+                    {isDealer && (
+                         <div style={{ 
+                             position: 'absolute', [position === 'bottom' ? 'bottom' : position === 'top' ? 'top' : 'top']: '-30px', 
+                             color: 'gold', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,215,0,0.5)', zIndex: 10,
+                             display: 'flex', alignItems: 'center', gap: '4px'
+                         }}>
+                             <span>莊</span>
+                             {dealerStreak > 0 && <span style={{fontSize: '0.8em'}}>連 {dealerStreak}</span>}
+                         </div>
+                    )}
                     {player.melds?.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '5px' }}>
                             {player.melds.map((m: any, i: number) => (
@@ -695,6 +756,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, onDiscar
                                 <TileRender
                                     key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical}
                                     isInteractable={isLocal && isCurrentTurn}
+                                    isDealer={isDealer}
                                     onClick={() => isLocal && isCurrentTurn && onDiscard && onDiscard(t.id)}
                                     position={position}
                                 />
@@ -715,7 +777,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, onDiscar
     )
 }
 
-const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom' }: any) => {
+const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isDealer = false }: any) => {
     let baseWidth = isLocal ? 'clamp(30px, 4vw, 48px)' : 'clamp(20px, 3vh, 32px)';
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
     let baseFontSize = isLocal ? 'clamp(0.9rem, 1.2vw, 1.2rem)' : 'clamp(0.6rem, 0.9vw, 0.9rem)';
@@ -739,7 +801,9 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
     else if (face.includes('筒')) color = '#3b82f6'; // Blue
 
     const isBack = (!isLocal && !isMeld && !isDiscard) || isHidden;
-    const background = isBack ? 'linear-gradient(135deg, #4b5563, #374151)' : 'linear-gradient(135deg, #f3f4f6, #d1d5db)';
+    const background = isBack 
+        ? (isDealer ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'linear-gradient(135deg, #4b5563, #374151)')
+        : 'linear-gradient(135deg, #f3f4f6, #d1d5db)';
 
     let contentRotation = 0;
     if (!isDiscard) {
