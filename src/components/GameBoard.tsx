@@ -22,6 +22,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     // Dealer Selection State
     const [selectingDealer, setSelectingDealer] = useState<boolean>(true);
     const [highlightedDealer, setHighlightedDealer] = useState<number | null>(null);
+    const isFirstHandRef = useRef<boolean>(true);
 
     // Game Loop State
     const [message, setMessage] = useState<string>('等待開局...');
@@ -33,6 +34,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     const [windRoundCount, setWindRoundCount] = useState<number>(0);
     const [isGameOver, setIsGameOver] = useState(false);
     const [consecutiveDealerCount, setConsecutiveDealerCount] = useState<number>(0);
+
+    // Player Info Panel State
+    const [showPlayerInfo, setShowPlayerInfo] = useState<boolean>(false);
 
     useEffect(() => {
         engine.initializePlayers("Player One", ["Bot Dong", "Bot Nan", "Bot Xi"]);
@@ -48,7 +52,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
 
     const startNewHand = (targetDealerIdx?: number) => {
         setIsStarted(false);
-        setSelectingDealer(true);
         if (targetDealerIdx !== undefined) engine.dealerIndex = targetDealerIdx;
         
         // Reset engine deck and hands without nuking points entirely
@@ -57,24 +60,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
         engine.players.forEach(p => { p.hand = []; p.melds = []; p.discards = []; });
         setPlayers([...engine.players]);
 
-        let ticks = 0;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        intervalRef.current = setInterval(() => {
-            setHighlightedDealer(ticks % 4);
-            ticks++;
-            if (ticks >= 20) {
-                clearInterval(intervalRef.current);
-                setHighlightedDealer(engine.dealerIndex);
+        if (isFirstHandRef.current) {
+            // Only show dealer selection animation on the very first hand
+            isFirstHandRef.current = false;
+            setSelectingDealer(true);
+            let ticks = 0;
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(() => {
+                setHighlightedDealer(ticks % 4);
+                ticks++;
+                if (ticks >= 20) {
+                    clearInterval(intervalRef.current);
+                    setHighlightedDealer(engine.dealerIndex);
 
-                delayObj.current = setTimeout(() => {
-                    setSelectingDealer(false);
-                    engine.dealTiles(engine.dealerIndex);
-                    setPlayers([...engine.players]);
-                    setIsStarted(true);
-                    startTurn(engine.dealerIndex);
-                }, 1500);
-            }
-        }, 100);
+                    delayObj.current = setTimeout(() => {
+                        setSelectingDealer(false);
+                        engine.dealTiles(engine.dealerIndex);
+                        setPlayers([...engine.players]);
+                        setIsStarted(true);
+                        startTurn(engine.dealerIndex);
+                    }, 1500);
+                }
+            }, 100);
+        } else {
+            // Subsequent hands: skip animation, deal immediately
+            setSelectingDealer(false);
+            engine.dealTiles(engine.dealerIndex);
+            setPlayers([...engine.players]);
+            setIsStarted(true);
+            startTurn(engine.dealerIndex);
+        }
     };
 
     const updateState = () => setPlayers([...engine.players]);
@@ -450,7 +465,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        style={{ position: 'absolute', bottom: '270px', left: '50%', transform: 'translateX(-50%)', zIndex: 15 }}
+                        style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 15 }}
                     >
                         <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(0,0,0,0.85)', border: '1px solid var(--primary)', borderRadius: '12px' }}>
                             <div style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '2px' }}>聽牌提示</div>
@@ -525,11 +540,80 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                         {availableActions.includes('pong') && <ActionButton label="碰" color="#10b981" onClick={() => handleAction('pong')} />}
                         {availableActions.includes('kong') && <ActionButton label="明槓" color="#eab308" onClick={() => handleAction('kong')} />}
                         {availableActions.includes('concealed_kong') && <ActionButton label="暗槓" color="#ca8a04" onClick={() => handleAction('concealed_kong')} />}
-                        {availableActions.includes('hu') && <ActionButton label="胡" color="#ef4444" onClick={() => handleAction('hu')} />}
+                        {availableActions.includes('hu') && (
+                            // pendingActionTile being null means this is a self-draw (自摸)
+                            <ActionButton
+                                label={!pendingActionTile || pendingActionTile.tile === null ? '自摸' : '胡'}
+                                color="#ef4444"
+                                onClick={() => handleAction('hu')}
+                            />
+                        )}
                         <ActionButton label="過" color="#6b7280" onClick={() => handleAction('skip')} />
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Player Info Toggle Button - bottom left */}
+            <div style={{ position: 'absolute', bottom: '20px', left: '20px', zIndex: 30 }}>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowPlayerInfo(v => !v)}
+                    style={{
+                        width: '44px', height: '44px', borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.7)', border: '1px solid var(--primary)',
+                        color: 'var(--primary)', fontSize: '1.3rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 10px var(--primary-glow)'
+                    }}
+                    title="玩家資訊"
+                >
+                    👥
+                </motion.button>
+                <AnimatePresence>
+                    {showPlayerInfo && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            style={{
+                                position: 'absolute', bottom: '52px', left: '0',
+                                background: 'rgba(0,0,0,0.9)', border: '1px solid var(--primary)',
+                                borderRadius: '12px', padding: '12px', minWidth: '230px',
+                                backdropFilter: 'blur(8px)', zIndex: 30
+                            }}
+                        >
+                            <div style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px' }}>玩家資訊</div>
+                            {players.map((p, i) => (
+                                <div key={i} style={{
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '6px 0',
+                                    borderBottom: i < players.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none'
+                                }}>
+                                    <div style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        background: i === 0 ? 'var(--primary)' : '#444',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontWeight: 'bold', fontSize: '0.85rem', flexShrink: 0,
+                                        border: engine.dealerIndex === i ? '2px solid gold' : '2px solid transparent'
+                                    }}>
+                                        {p.name[0]}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: engine.dealerIndex === i ? 'gold' : '#fff' }}>
+                                            {p.name}{engine.dealerIndex === i ? ' (莊)' : ''}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.points} pts</div>
+                                    </div>
+                                    {engine.currentTurn === i && isStarted && (
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 6px var(--primary-glow)' }} />
+                                    )}
+                                </div>
+                            ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
             <AnimatePresence>
                 {settlementData && (
@@ -566,7 +650,7 @@ const ActionButton = ({ label, color, onClick }: { label: string, color: string,
     </motion.button>
 );
 
-const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak, isCurrentTurn, onDiscard }: any) => {
+const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, onDiscard }: any) => {
     const isVertical = position === 'left' || position === 'right';
     const posStyles: Record<string, React.CSSProperties> = {
         bottom: { bottom: '20px', left: '50%', transform: 'translateX(-50%)', flexDirection: 'column' },
@@ -575,10 +659,10 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
         right: { right: '20px', top: '50%', transform: 'translateY(-50%)', flexDirection: 'row' }
     };
     const discardPosStyles: Record<string, React.CSSProperties> = {
-        bottom: { bottom: '150px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        top: { top: '150px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        left: { left: '150px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
-        right: { right: '150px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
+        bottom: { bottom: '240px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
+        top: { top: '240px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
+        left: { left: '240px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
+        right: { right: '240px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
     };
     const meldHandContainerStyles: Record<string, React.CSSProperties> = {
         bottom: { flexDirection: 'column' },
@@ -589,27 +673,18 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
 
     return (
         <>
-            <div style={{ position: 'absolute', display: 'flex', alignItems: 'center', gap: '20px', ...(posStyles[position] || {}), zIndex: 5 }}>
-                <div className="glass-panel" style={{
-                    padding: '10px', display: 'flex', flexDirection: isVertical ? 'column' : 'row', alignItems: 'center', gap: '10px',
-                    boxShadow: isCurrentTurn ? '0 0 20px var(--primary-glow)' : 'none',
-                    border: isCurrentTurn ? '1px solid var(--primary)' : '1px solid var(--glass-border)'
+            <div style={{
+                    position: 'absolute', display: 'flex', alignItems: 'center', gap: '20px', ...(posStyles[position] || {}), zIndex: 5,
+                    borderRadius: '12px',
+                    boxShadow: isCurrentTurn ? '0 0 18px var(--primary-glow)' : 'none',
+                    transition: 'box-shadow 0.3s ease'
                 }}>
-                    <div style={{ width: '40px', height: '40px', background: isLocal ? 'var(--primary)' : '#333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{player.name[0]}</div>
-                    <div style={{ textAlign: isVertical ? 'center' : 'left' }}>
-                        <div style={{ fontSize: '0.9rem', color: isDealer ? 'var(--primary)' : '#fff', fontWeight: 'bold' }}>
-                            {player.name} {isDealer && `(莊)${dealerStreak > 0 ? `[連${dealerStreak}]` : ''}`}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{player.points} pts</div>
-                    </div>
-                </div>
-
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', ...(meldHandContainerStyles[position] || {}) }}>
                     {player.melds?.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '5px' }}>
                             {player.melds.map((m: any, i: number) => (
                                 <div key={i} style={{ display: 'flex', flexDirection: isVertical ? 'column' : 'row', gap: '1px' }}>
-                                    {m.tiles.map((t: any) => (<TileRender key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical} isMeld={true} isHidden={m.type === 'concealed_kong' && !isLocal} />))}
+                                    {m.tiles.map((t: any) => (<TileRender key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical} isMeld={true} isHidden={m.type === 'concealed_kong' && !isLocal} position={position} />))}
                                 </div>
                             ))}
                         </div>
@@ -621,6 +696,7 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
                                     key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical}
                                     isInteractable={isLocal && isCurrentTurn}
                                     onClick={() => isLocal && isCurrentTurn && onDiscard && onDiscard(t.id)}
+                                    position={position}
                                 />
                             ))}
                         </div>
@@ -631,7 +707,7 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
             <div style={{ position: 'absolute', display: 'flex', flexWrap: 'wrap', gap: '3px', alignContent: 'flex-start', zIndex: 2, ...(discardPosStyles[position] || {}) }}>
                 <AnimatePresence>
                     {player.discards?.map((t: any) => (
-                        <TileRender key={t.id} tile={t} isLocal={true} isVertical={false} isDiscard={true} />
+                        <TileRender key={t.id} tile={t} isLocal={true} isVertical={false} isDiscard={true} position={position} />
                     ))}
                 </AnimatePresence>
             </div>
@@ -639,22 +715,38 @@ const PlayerArea = ({ player, position, isLocal = false, isDealer, dealerStreak,
     )
 }
 
-const TileRender = ({ tile, isLocal, isVertical, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false }: any) => {
-    let width = isVertical ? 'clamp(20px, 3vh, 30px)' : (isLocal || isMeld ? 'clamp(32px, 4.5vw, 48px)' : 'clamp(20px, 3vw, 30px)');
-    let height = isVertical ? 'clamp(28px, 4vh, 40px)' : (isLocal || isMeld ? 'clamp(44px, 6vw, 64px)' : 'clamp(28px, 4vw, 40px)');
-    let fontSize = isLocal || isMeld ? 'clamp(0.9rem, 1.5vw, 1.2rem)' : 'clamp(0.7rem, 1vw, 1rem)';
+const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom' }: any) => {
+    let baseWidth = isLocal ? 'clamp(30px, 4vw, 48px)' : 'clamp(20px, 3vh, 32px)';
+    let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
+    let baseFontSize = isLocal ? 'clamp(0.9rem, 1.2vw, 1.2rem)' : 'clamp(0.6rem, 0.9vw, 0.9rem)';
 
     if (isDiscard) {
-        width = 'clamp(22px, 2.5vw, 30px)'; 
-        height = 'clamp(33px, 3.5vw, 45px)'; 
-        fontSize = 'clamp(0.7rem, 1vw, 1rem)';
+        baseWidth = 'clamp(22px, 2.5vw, 30px)'; 
+        baseHeight = 'clamp(33px, 3.5vw, 45px)'; 
+        baseFontSize = 'clamp(0.7rem, 1vw, 1rem)';
     }
+
+    const isHorizontalLayout = (position === 'left' || position === 'right') && !isDiscard;
+
+    const width = isHorizontalLayout ? baseHeight : baseWidth;
+    const height = isHorizontalLayout ? baseWidth : baseHeight;
+    const fontSize = baseFontSize;
 
     const face = getTileFace(tile);
     let color = '#000'; // Default black for winds and white dragons
     if (face.includes('萬') || face === '中') color = '#ef4444'; // Red
     else if (face.includes('條') || face === '發') color = '#10b981'; // Green
     else if (face.includes('筒')) color = '#3b82f6'; // Blue
+
+    const isBack = (!isLocal && !isMeld && !isDiscard) || isHidden;
+    const background = isBack ? 'linear-gradient(135deg, #4b5563, #374151)' : 'linear-gradient(135deg, #f3f4f6, #d1d5db)';
+
+    let contentRotation = 0;
+    if (!isDiscard) {
+        if (position === 'left') contentRotation = 90;
+        else if (position === 'right') contentRotation = -90;
+        else if (position === 'top') contentRotation = 180;
+    }
 
     return (
         <motion.div
@@ -666,21 +758,25 @@ const TileRender = ({ tile, isLocal, isVertical, isMeld = false, isDiscard = fal
             onClick={onClick}
             style={{
                 width, height,
-                background: (!isLocal && !isMeld && !isDiscard) ? 'linear-gradient(135deg, #4b5563, #374151)' : 'linear-gradient(135deg, #f3f4f6, #d1d5db)',
+                background,
                 borderRadius: '6px',
                 border: '1px solid rgba(0,0,0,0.3)',
                 boxShadow: isInteractable ? '0 5px 15px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexDirection: 'column',
                 color, fontWeight: '900', fontSize,
                 cursor: isInteractable ? 'pointer' : 'default',
             }}
         >
-            {(!isLocal && !isMeld && !isDiscard) || isHidden ? '' : (
-                <>
+            {isBack ? '' : (
+                <div style={{
+                    transform: `rotate(${contentRotation}deg)`,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    width: isHorizontalLayout ? height : width,
+                    height: isHorizontalLayout ? width : height
+                }}>
                     <span>{face.slice(0, 1)}</span>
                     {face.length > 1 && <span style={{ fontSize: '0.7em', color: '#000' }}>{face.slice(1)}</span>}
-                </>
+                </div>
             )}
         </motion.div>
     )
