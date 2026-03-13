@@ -390,8 +390,10 @@ export class MahjongEngine {
              const tilesToUse = combinationTiles || [];
              if (tilesToUse.length === 2) {
                  const removed = removeTilesByIds(tilesToUse.map(t => t.id));
-                 const sortedTotal = [...removed, targetTile].sort((a,b) => (a.value as number) - (b.value as number));
-                 p.melds.push({ type: 'chow', tiles: sortedTotal, fromPlayer: discardingPlayerIndex });
+                 removed.sort((a, b) => (a.value as number) - (b.value as number));
+                 // Place eaten tile in the middle: [lower, eaten, higher]
+                 const arranged = [removed[0], targetTile, removed[1]];
+                 p.melds.push({ type: 'chow', tiles: arranged, fromPlayer: discardingPlayerIndex });
              } else {
                 // Simplified fallback
                 const val = targetTile.value as number;
@@ -405,8 +407,9 @@ export class MahjongEngine {
                 if (combo.length === 2) {
                     const r1 = removeTilesByCount(1, t => t.type === targetTile.type && t.value === combo[0])[0];
                     const r2 = removeTilesByCount(1, t => t.type === targetTile.type && t.value === combo[1])[0];
-                    const sortedRest = [r1, r2, targetTile].sort((a,b) => (a.value as number) - (b.value as number));
-                    p.melds.push({ type: 'chow', tiles: sortedRest, fromPlayer: discardingPlayerIndex });
+                    const removed = [r1, r2].sort((a, b) => (a.value as number) - (b.value as number));
+                    const arranged = [removed[0], targetTile, removed[1]];
+                    p.melds.push({ type: 'chow', tiles: arranged, fromPlayer: discardingPlayerIndex });
                 }
              }
         }

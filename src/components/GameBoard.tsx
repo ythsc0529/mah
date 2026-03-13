@@ -19,6 +19,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     const [availableActions, setAvailableActions] = useState<{ type: string; tiles?: Tile[][] }[]>([]);
     const [pendingActionTile, setPendingActionTile] = useState<{ tile: Tile, fromPlayerIndex: number } | null>(null);
     const [chowChoices, setChowChoices] = useState<Tile[][] | null>(null);
+    const [lastDiscardedTileId, setLastDiscardedTileId] = useState<string | null>(null);
 
     // Dealer Selection State
     const [selectingDealer, setSelectingDealer] = useState<boolean>(true);
@@ -133,6 +134,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
 
     const handleDiscard = (pIdx: number, tileId: string) => {
         engine.discardTile(pIdx, tileId);
+        setLastDiscardedTileId(tileId);
         updateState();
 
         // Check for interruptions (Chow, Pong, Kong, Hu)
@@ -185,6 +187,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                     const combination = actionData?.tiles ? actionData.tiles[0] : undefined;
 
                     engine.executeAction(npcIdx, actionName, tile, pIdx, combination);
+                    if (tile) setLastDiscardedTileId(null);
                     updateState();
                     setMessage(`${engine.players[npcIdx].name} ${actionName === 'pong' ? '碰' : actionName.includes('kong') ? '槓' : '吃'}！`);
                     
@@ -371,6 +374,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             const targetTile = pendingActionTile ? pendingActionTile.tile : null;
             
             engine.executeAction(0, actionType, targetTile, fromPlayerIdx, selectedTiles);
+            if (targetTile) setLastDiscardedTileId(null);
             updateState();
             setPendingActionTile(null);
             
@@ -447,19 +451,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                 <button className="btn-secondary" onClick={onExit} style={{ padding: '8px 16px' }}>離開牌桌</button>
             </div>
 
-            {/* Subtitles & Notifications */}
+            {/* Subtitles & Notifications - Only for important events now */}
             <div style={{ position: 'absolute', top: '100px', left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}>
                 <AnimatePresence mode="wait">
-                    <motion.div
-                        key={message}
-                        initial={{ y: -20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 20, opacity: 0 }}
-                        className="glass-panel"
-                        style={{ padding: '10px 20px', color: 'var(--primary)', fontWeight: 'bold', fontSize: '1.2rem', background: 'rgba(0,0,0,0.6)' }}
-                    >
-                        {message}
-                    </motion.div>
+                    {(message.includes('流局') || message.includes('胡') || message.includes('獲勝') || message.includes('自摸')) && (
+                        <motion.div
+                            key={message}
+                            initial={{ y: -20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            className="glass-panel"
+                            style={{ padding: '10px 20px', color: 'var(--primary)', fontWeight: 'bold', fontSize: '1.2rem', background: 'rgba(0,0,0,0.6)' }}
+                        >
+                            {message}
+                        </motion.div>
+                    )}
                 </AnimatePresence>
             </div>
 
@@ -485,7 +491,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 15 }}
+                        style={{ position: 'absolute', top: '80px', right: '20px', zIndex: 15 }}
                     >
                         <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(0,0,0,0.85)', border: '1px solid var(--primary)', borderRadius: '12px' }}>
                             <div style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '2px' }}>聽牌提示</div>
@@ -503,10 +509,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
                 )}
             </AnimatePresence>
 
-            <PlayerArea player={players[2]} position="top" isDealer={engine.dealerIndex === 2 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 2 && isStarted} />
-            <PlayerArea player={players[1]} position="right" isDealer={engine.dealerIndex === 1 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 1 && isStarted} />
-            <PlayerArea player={players[3]} position="left" isDealer={engine.dealerIndex === 3 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
-            <PlayerArea player={players[0]} position="bottom" isLocal={true} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
+            <PlayerArea player={players[2]} position="top" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 2 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 2 && isStarted} />
+            <PlayerArea player={players[1]} position="right" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 1 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 1 && isStarted} />
+            <PlayerArea player={players[3]} position="left" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 3 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
+            <PlayerArea player={players[0]} position="bottom" isLocal={true} lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
 
             {/* Local Dealer Indicator */}
             {!selectingDealer && engine.dealerIndex === 0 && (
@@ -701,7 +707,7 @@ const ActionButton = ({ label, color, onClick }: { label: string, color: string,
     </motion.button>
 );
 
-const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer, dealerStreak, onDiscard }: any) => {
+const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer, dealerStreak, onDiscard, lastDiscardedTileId }: any) => {
     const isVertical = position === 'left' || position === 'right';
     const posStyles: Record<string, React.CSSProperties> = {
         bottom: { bottom: '20px', left: '50%', transform: 'translateX(-50%)', flexDirection: 'column' },
@@ -710,10 +716,10 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
         right: { right: '20px', top: '50%', transform: 'translateY(-50%)', flexDirection: 'row' }
     };
     const discardPosStyles: Record<string, React.CSSProperties> = {
-        bottom: { bottom: '240px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        top: { top: '240px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        left: { left: '240px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
-        right: { right: '240px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
+        bottom: { bottom: '160px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
+        top: { top: '160px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
+        left: { left: '160px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
+        right: { right: '160px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
     };
     const meldHandContainerStyles: Record<string, React.CSSProperties> = {
         bottom: { flexDirection: 'column' },
@@ -769,7 +775,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
             <div style={{ position: 'absolute', display: 'flex', flexWrap: 'wrap', gap: '3px', alignContent: 'flex-start', zIndex: 2, ...(discardPosStyles[position] || {}) }}>
                 <AnimatePresence>
                     {player.discards?.map((t: any) => (
-                        <TileRender key={t.id} tile={t} isLocal={true} isVertical={false} isDiscard={true} position={position} />
+                        <TileRender key={t.id} tile={t} isLocal={true} isVertical={false} isDiscard={true} position={position} isLastDiscard={t.id === lastDiscardedTileId} />
                     ))}
                 </AnimatePresence>
             </div>
@@ -777,7 +783,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
     )
 }
 
-const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isDealer = false }: any) => {
+const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isDealer = false, isLastDiscard = false }: any) => {
     let baseWidth = isLocal ? 'clamp(30px, 4vw, 48px)' : 'clamp(20px, 3vh, 32px)';
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
     let baseFontSize = isLocal ? 'clamp(0.9rem, 1.2vw, 1.2rem)' : 'clamp(0.6rem, 0.9vw, 0.9rem)';
@@ -815,17 +821,21 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
     return (
         <motion.div
             layoutId={tile.id}
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            whileHover={isInteractable ? { y: -10 } : {}}
+            initial={isDiscard ? { scale: 1.5, opacity: 0 } : { opacity: 0, y: 20 }}
+            animate={{ 
+                scale: 1, opacity: 1, y: 0,
+                boxShadow: isLastDiscard ? '0 0 10px 2px var(--primary)' : 'none',
+                borderColor: isLastDiscard ? 'var(--primary)' : 'var(--glass-border)'
+            }}
+            whileHover={isInteractable ? { y: -15, scale: 1.05, filter: 'brightness(1.2)' } : {}}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             onClick={onClick}
             style={{
                 width, height,
                 background,
                 borderRadius: '6px',
-                border: '1px solid rgba(0,0,0,0.3)',
-                boxShadow: isInteractable ? '0 5px 15px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)',
+                border: isLastDiscard ? '2px solid var(--primary)' : '1px solid rgba(0,0,0,0.3)',
+                boxShadow: isLastDiscard ? '0 0 15px var(--primary-glow)' : (isInteractable ? '0 5px 15px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color, fontWeight: '900', fontSize,
                 cursor: isInteractable ? 'pointer' : 'default',
