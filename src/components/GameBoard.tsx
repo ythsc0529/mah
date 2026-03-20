@@ -783,33 +783,33 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
     )
 }
 
-const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isDealer = false, isLastDiscard = false }: any) => {
+const getTileImageSrc = (tile: Tile): string => {
+    if (!tile) return '';
+    if (tile.type === 'character') return `/${tile.value}萬.png`;
+    if (tile.type === 'bamboo') return `/${tile.value}條.png`;
+    if (tile.type === 'dot') return `/${tile.value}筒.png`;
+    const windMap: Record<string, string> = { east: '東', south: '南', west: '西', north: '北' };
+    if (tile.type === 'wind' && typeof tile.value === 'string') return `/${windMap[tile.value]}.png`;
+    const dragonMap: Record<string, string> = { red: '中', green: '發', white: '白板' };
+    if (tile.type === 'dragon' && typeof tile.value === 'string') return `/${dragonMap[tile.value]}.png`;
+    return '';
+};
+
+const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isLastDiscard = false }: any) => {
     let baseWidth = isLocal ? 'clamp(30px, 4vw, 48px)' : 'clamp(20px, 3vh, 32px)';
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
-    let baseFontSize = isLocal ? 'clamp(0.9rem, 1.2vw, 1.2rem)' : 'clamp(0.6rem, 0.9vw, 0.9rem)';
 
     if (isDiscard) {
         baseWidth = 'clamp(22px, 2.5vw, 30px)'; 
         baseHeight = 'clamp(33px, 3.5vw, 45px)'; 
-        baseFontSize = 'clamp(0.7rem, 1vw, 1rem)';
     }
 
     const isHorizontalLayout = (position === 'left' || position === 'right') && !isDiscard;
 
     const width = isHorizontalLayout ? baseHeight : baseWidth;
     const height = isHorizontalLayout ? baseWidth : baseHeight;
-    const fontSize = baseFontSize;
-
-    const face = getTileFace(tile);
-    let color = '#000'; // Default black for winds and white dragons
-    if (face.includes('萬') || face === '中') color = '#ef4444'; // Red
-    else if (face.includes('條') || face === '發') color = '#10b981'; // Green
-    else if (face.includes('筒')) color = '#3b82f6'; // Blue
 
     const isBack = (!isLocal && !isMeld && !isDiscard) || isHidden;
-    const background = isBack 
-        ? (isDealer ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'linear-gradient(135deg, #4b5563, #374151)')
-        : 'linear-gradient(135deg, #f3f4f6, #d1d5db)';
 
     let contentRotation = 0;
     if (!isDiscard) {
@@ -817,6 +817,8 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
         else if (position === 'right') contentRotation = -90;
         else if (position === 'top') contentRotation = 180;
     }
+
+    const imgSrc = isBack ? '/牌背_粉2.png' : getTileImageSrc(tile);
 
     return (
         <motion.div
@@ -832,26 +834,27 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
             onClick={onClick}
             style={{
                 width, height,
-                background,
                 borderRadius: '6px',
-                border: isLastDiscard ? '2px solid var(--primary)' : '1px solid rgba(0,0,0,0.3)',
+                border: isLastDiscard ? '2px solid var(--primary)' : '1px solid rgba(0,0,0,0.15)',
                 boxShadow: isLastDiscard ? '0 0 15px var(--primary-glow)' : (isInteractable ? '0 5px 15px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color, fontWeight: '900', fontSize,
                 cursor: isInteractable ? 'pointer' : 'default',
+                overflow: 'hidden',
+                backgroundColor: 'transparent',
             }}
         >
-            {isBack ? '' : (
-                <div style={{
-                    transform: `rotate(${contentRotation}deg)`,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            <img
+                src={imgSrc}
+                alt={isBack ? '牌背' : getTileFace(tile)}
+                style={{
                     width: isHorizontalLayout ? height : width,
-                    height: isHorizontalLayout ? width : height
-                }}>
-                    <span>{face.slice(0, 1)}</span>
-                    {face.length > 1 && <span style={{ fontSize: '0.7em', color: '#000' }}>{face.slice(1)}</span>}
-                </div>
-            )}
+                    height: isHorizontalLayout ? width : height,
+                    objectFit: 'cover',
+                    transform: `rotate(${contentRotation}deg)`,
+                    display: 'block',
+                    borderRadius: '4px',
+                }}
+            />
         </motion.div>
     )
 }
