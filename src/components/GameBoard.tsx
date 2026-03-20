@@ -20,6 +20,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     const [pendingActionTile, setPendingActionTile] = useState<{ tile: Tile, fromPlayerIndex: number } | null>(null);
     const [chowChoices, setChowChoices] = useState<Tile[][] | null>(null);
     const [lastDiscardedTileId, setLastDiscardedTileId] = useState<string | null>(null);
+    const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
+    const isDiscardingRef = useRef<boolean>(false);
 
     // Dealer Selection State
     const [selectingDealer, setSelectingDealer] = useState<boolean>(true);
@@ -266,10 +268,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
     };
 
     const onLocalDiscardTile = (tileId: string) => {
-        if (engine.currentTurn === 0 && availableActions.length === 0) {
+        if (engine.currentTurn !== 0 || availableActions.length > 0) return;
+        if (isDiscardingRef.current) return; // prevent rapid multi-click
+
+        if (selectedTileId === tileId) {
+            // Second click on same tile → discard it
+            isDiscardingRef.current = true;
+            setSelectedTileId(null);
             handleDiscard(0, tileId);
+            // Release lock after a short delay
+            setTimeout(() => { isDiscardingRef.current = false; }, 800);
+        } else {
+            // First click → select the tile
+            setSelectedTileId(tileId);
         }
     };
+
+    // When turn changes away from player, clear selection
+    useEffect(() => {
+        if (engine.currentTurn !== 0) setSelectedTileId(null);
+    }, [engine.currentTurn]);
 
     const [tingOptions, setTingOptions] = useState<{ discard: Tile | null, waiting: { type: string, value: any }[] }[]>([]);
 
@@ -512,7 +530,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ config, onExit }) => {
             <PlayerArea player={players[2]} position="top" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 2 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 2 && isStarted} />
             <PlayerArea player={players[1]} position="right" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 1 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 1 && isStarted} />
             <PlayerArea player={players[3]} position="left" lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 3 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 3 && isStarted} />
-            <PlayerArea player={players[0]} position="bottom" isLocal={true} lastDiscardedTileId={lastDiscardedTileId} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
+            <PlayerArea player={players[0]} position="bottom" isLocal={true} lastDiscardedTileId={lastDiscardedTileId} selectedTileId={selectedTileId} isDealer={engine.dealerIndex === 0 && !selectingDealer} dealerStreak={consecutiveDealerCount} isCurrentTurn={engine.currentTurn === 0 && isStarted} onDiscard={onLocalDiscardTile} />
 
             {/* Local Dealer Indicator */}
             {!selectingDealer && engine.dealerIndex === 0 && (
@@ -707,7 +725,7 @@ const ActionButton = ({ label, color, onClick }: { label: string, color: string,
     </motion.button>
 );
 
-const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer, dealerStreak, onDiscard, lastDiscardedTileId }: any) => {
+const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer, dealerStreak, onDiscard, lastDiscardedTileId, selectedTileId }: any) => {
     const isVertical = position === 'left' || position === 'right';
     const posStyles: Record<string, React.CSSProperties> = {
         bottom: { bottom: '20px', left: '50%', transform: 'translateX(-50%)', flexDirection: 'column' },
@@ -762,6 +780,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
                                 <TileRender
                                     key={t.id} tile={t} isLocal={isLocal} isVertical={isVertical}
                                     isInteractable={isLocal && isCurrentTurn}
+                                    isSelected={isLocal && isCurrentTurn && t.id === selectedTileId}
                                     isDealer={isDealer}
                                     onClick={() => isLocal && isCurrentTurn && onDiscard && onDiscard(t.id)}
                                     position={position}
@@ -795,7 +814,7 @@ const getTileImageSrc = (tile: Tile): string => {
     return '';
 };
 
-const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, onClick, isHidden = false, position = 'bottom', isLastDiscard = false }: any) => {
+const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isInteractable = false, isSelected = false, onClick, isHidden = false, position = 'bottom', isLastDiscard = false }: any) => {
     let baseWidth = isLocal ? 'clamp(30px, 4vw, 48px)' : 'clamp(20px, 3vh, 32px)';
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
 
@@ -825,9 +844,12 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
             layoutId={tile.id}
             initial={isDiscard ? { scale: 1.5, opacity: 0 } : { opacity: 0, y: 20 }}
             animate={{ 
-                scale: 1, opacity: 1, y: 0,
-                boxShadow: isLastDiscard ? '0 0 10px 2px var(--primary)' : 'none',
-                borderColor: isLastDiscard ? 'var(--primary)' : 'var(--glass-border)'
+                scale: 1, opacity: 1,
+                y: isSelected ? -20 : 0,
+                boxShadow: isSelected
+                    ? '0 0 18px 4px #facc15'
+                    : isLastDiscard ? '0 0 10px 2px var(--primary)' : 'none',
+                borderColor: isSelected ? '#facc15' : isLastDiscard ? 'var(--primary)' : 'var(--glass-border)'
             }}
             whileHover={isInteractable ? { y: -15, scale: 1.05, filter: 'brightness(1.2)' } : {}}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -835,7 +857,7 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
             style={{
                 width, height,
                 borderRadius: '6px',
-                border: isLastDiscard ? '2px solid var(--primary)' : '1px solid rgba(0,0,0,0.15)',
+                border: isSelected ? '2px solid #facc15' : isLastDiscard ? '2px solid var(--primary)' : '1px solid rgba(0,0,0,0.15)',
                 boxShadow: isLastDiscard ? '0 0 15px var(--primary-glow)' : (isInteractable ? '0 5px 15px rgba(0,0,0,0.5)' : '0 2px 4px rgba(0,0,0,0.3)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: isInteractable ? 'pointer' : 'default',
