@@ -716,10 +716,10 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
         right: { right: '20px', top: '50%', transform: 'translateY(-50%)', flexDirection: 'row' }
     };
     const discardPosStyles: Record<string, React.CSSProperties> = {
-        bottom: { bottom: '160px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        top: { top: '160px', left: '50%', transform: 'translateX(-50%)', width: '300px' },
-        left: { left: '160px', top: '50%', transform: 'translateY(-50%)', width: '150px' },
-        right: { right: '160px', top: '50%', transform: 'translateY(-50%)', width: '150px' }
+        bottom: { bottom: '155px', left: '50%', transform: 'translateX(-50%)', width: '380px', maxHeight: '120px', overflowY: 'auto' },
+        top: { top: '155px', left: '50%', transform: 'translateX(-50%)', width: '380px', maxHeight: '120px', overflowY: 'auto' },
+        left: { left: '155px', top: '50%', transform: 'translateY(-50%)', width: '170px', maxHeight: '300px', overflowY: 'auto' },
+        right: { right: '155px', top: '50%', transform: 'translateY(-50%)', width: '170px', maxHeight: '300px', overflowY: 'auto' }
     };
     const meldHandContainerStyles: Record<string, React.CSSProperties> = {
         bottom: { flexDirection: 'column' },
@@ -772,7 +772,7 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
                 </div>
             </div>
 
-            <div style={{ position: 'absolute', display: 'flex', flexWrap: 'wrap', gap: '3px', alignContent: 'flex-start', zIndex: 2, ...(discardPosStyles[position] || {}) }}>
+            <div style={{ position: 'absolute', display: 'flex', flexWrap: 'wrap', gap: '2px', alignContent: 'flex-start', alignItems: 'flex-start', zIndex: 2, ...(discardPosStyles[position] || {}) }}>
                 <AnimatePresence>
                     {player.discards?.map((t: any) => (
                         <TileRender key={t.id} tile={t} isLocal={true} isVertical={false} isDiscard={true} position={position} isLastDiscard={t.id === lastDiscardedTileId} />
@@ -800,8 +800,8 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
 
     if (isDiscard) {
-        baseWidth = 'clamp(22px, 2.5vw, 30px)'; 
-        baseHeight = 'clamp(33px, 3.5vw, 45px)'; 
+        baseWidth = 'clamp(20px, 2.2vw, 28px)';
+        baseHeight = 'clamp(30px, 3.1vw, 40px)';
     }
 
     const isHorizontalLayout = (position === 'left' || position === 'right') && !isDiscard;
