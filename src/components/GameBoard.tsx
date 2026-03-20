@@ -734,10 +734,10 @@ const PlayerArea = ({ player, position, isLocal = false, isCurrentTurn, isDealer
         right: { right: '20px', top: '50%', transform: 'translateY(-50%)', flexDirection: 'row' }
     };
     const discardPosStyles: Record<string, React.CSSProperties> = {
-        bottom: { bottom: '155px', left: '50%', transform: 'translateX(-50%)', width: '380px', maxHeight: '120px', overflowY: 'auto' },
-        top: { top: '155px', left: '50%', transform: 'translateX(-50%)', width: '380px', maxHeight: '120px', overflowY: 'auto' },
-        left: { left: '155px', top: '50%', transform: 'translateY(-50%)', width: '170px', maxHeight: '300px', overflowY: 'auto' },
-        right: { right: '155px', top: '50%', transform: 'translateY(-50%)', width: '170px', maxHeight: '300px', overflowY: 'auto' }
+        bottom: { bottom: 'clamp(95px, 25vh, 155px)', left: '50%', transform: 'translateX(-50%)', width: 'clamp(180px, 45vw, 380px)', maxHeight: 'clamp(60px, 20vh, 120px)', overflowY: 'auto' },
+        top: { top: 'clamp(95px, 25vh, 155px)', left: '50%', transform: 'translateX(-50%)', width: 'clamp(180px, 45vw, 380px)', maxHeight: 'clamp(60px, 20vh, 120px)', overflowY: 'auto' },
+        left: { left: 'clamp(65px, 20vw, 155px)', top: '50%', transform: 'translateY(-50%)', width: 'clamp(80px, 25vw, 170px)', maxHeight: 'clamp(100px, 35vh, 300px)', overflowY: 'auto' },
+        right: { right: 'clamp(65px, 20vw, 155px)', top: '50%', transform: 'translateY(-50%)', width: 'clamp(80px, 25vw, 170px)', maxHeight: 'clamp(100px, 35vh, 300px)', overflowY: 'auto' }
     };
     const meldHandContainerStyles: Record<string, React.CSSProperties> = {
         bottom: { flexDirection: 'column' },
@@ -819,8 +819,8 @@ const TileRender = ({ tile, isLocal, isMeld = false, isDiscard = false, isIntera
     let baseHeight = isLocal ? 'clamp(42px, 5.5vw, 64px)' : 'clamp(28px, 4.2vh, 45px)';
 
     if (isDiscard) {
-        baseWidth = 'clamp(20px, 2.2vw, 28px)';
-        baseHeight = 'clamp(30px, 3.1vw, 40px)';
+        baseWidth = 'clamp(16px, 2.8vmin, 28px)';
+        baseHeight = 'clamp(24px, 4.2vmin, 40px)';
     }
 
     const isHorizontalLayout = (position === 'left' || position === 'right') && !isDiscard;
